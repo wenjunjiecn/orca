@@ -97,3 +97,50 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
           compression-level: 0
+
+      # Launch the installed build hidden so a startup crash fails CI with its logs, not on a user's machine.
+      - name: Smoke-launch the installed application
+        id: smoke
+        shell: pwsh
+        env:
+          ELECTRON_ENABLE_LOGGING: '1'
+          ELECTRON_ENABLE_STACK_DUMPING: '1'
+        run: |
+          $diag = New-Item -ItemType Directory -Force artifacts/smoke
+          Start-Process -FilePath dist/orca-windows-setup.exe -ArgumentList '/S' -Wait
+          $exe = @('Programs/Orca/Orca.exe', 'Programs/orca/Orca.exe') |
+            ForEach-Object { Join-Path $env:LOCALAPPDATA $_ } | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw 'Installed Orca.exe not found after silent install' }
+          "installed: $exe" | Tee-Object -FilePath "$diag/summary.txt"
+          $app = Start-Process -FilePath $exe -ArgumentList '--remote-debugging-port=9333' -PassThru `
+            -RedirectStandardOutput "$diag/stdout.log" -RedirectStandardError "$diag/stderr.log"
+          $deadline = (Get-Date).AddSeconds(60)
+          while (-not $app.HasExited -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+          $alive = -not $app.HasExited
+          try {
+            (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9333/json/list -TimeoutSec 5).Content |
+              Set-Content "$diag/cdp-targets.json"
+          } catch { "cdp: $_" | Add-Content "$diag/summary.txt" }
+          if ($alive) { "alive after 60s" | Add-Content "$diag/summary.txt" }
+          else { "exited early with code $($app.ExitCode)" | Add-Content "$diag/summary.txt" }
+          Get-Process -Name Orca -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          foreach ($root in @("$env:APPDATA/Orca", "$env:APPDATA/orca", "$env:LOCALAPPDATA/Orca", "$env:TEMP/Orca Crashes")) {
+            foreach ($sub in @('logs', 'Crashpad')) {
+              $path = Join-Path $root $sub
+              if (-not (Test-Path $path)) { continue }
+              Copy-Item -Recurse -Force $path (Join-Path $diag ((Split-Path $root -Leaf) + "-$sub")) -ErrorAction SilentlyContinue
+            }
+          }
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddMinutes(-5) } -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'Orca' } | Format-List TimeCreated, ProviderName, Id, Message |
+            Out-File "$diag/windows-events.txt"
+          Get-Content "$diag/summary.txt"
+          if (-not $alive) { exit 1 }
+
+      - name: Upload smoke-launch diagnostics
+        if: always() && steps.smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-dsh-windows-smoke
+          path: artifacts/smoke
+          if-no-files-found: warn
