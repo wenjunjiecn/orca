@@ -32,6 +32,13 @@ env:
   ADHOC_RETAIN_DAYS: 30
 
 jobs:
+  # GitHub discovers this manual entry point on the fork's default branch.
+  build-fork-dsh-macos:
+    if: github.repository == 'wenjunjiecn/orca' && startsWith(github.ref, 'refs/heads/feat/dsh-native-chat-v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dsh-macos-build.yml
+
   # Resolve once before source execution so concurrent pushes cannot mix slot/template/desktop commits.
   resolve-ref:
     if: github.repository == 'stablyai/orca'
