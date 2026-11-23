@@ -39,6 +39,8 @@ const NODE_RUNTIME_INCLUDE = [
 
   'src/main/pi/rpc/rpc-session-startup.test.ts',
   'src/main/native-chat/agent-session-wire/host/testing/structured-agent-session-clear-queued-command.test.ts',
+  'src/main/acp/session/acp-structured-dsh-session.test.ts',
+  'src/main/acp/session/acp-structured-dsh-updates.test.ts',
   'src/main/acp/session/acp-structured-session-adapter.test.ts',
   'src/main/acp/session/acp-structured-session-adapter-resume.test.ts',
   'src/main/pi/rpc/rpc-turn-races.test.ts',

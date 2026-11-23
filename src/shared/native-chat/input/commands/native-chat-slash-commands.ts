@@ -168,7 +168,11 @@ const COMMANDS_BY_AGENT: Partial<Record<AgentType, readonly SlashCommandSuggesti
   codex: CODEX_COMMANDS,
   omp: OMP_COMMANDS,
   opencode: OPENCODE_COMMANDS,
-  opencode2: OPENCODE_COMMANDS
+  opencode2: OPENCODE_COMMANDS,
+  dsh: [
+    { name: 'goal', description: 'Describe a task goal in a message', argumentHint: '<objective>' },
+    { name: 'plan', description: 'Ask for a plan before implementation', argumentHint: '<task>' }
+  ]
 }
 
 /** Known slash commands for an agent, falling back to a small common set so the

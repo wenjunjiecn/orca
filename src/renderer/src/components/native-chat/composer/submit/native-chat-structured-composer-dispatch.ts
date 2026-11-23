@@ -8,10 +8,12 @@ import { imageReferencesToPromptMarkers } from '../../../../../../shared/native-
 import type { StructuredAgentSessionCommandOutcome } from '../../../../../../shared/agent-session/view/structured-agent-session-composer'
 import type { NativeChatStructuredComposerTransport } from './native-chat-structured-composer-transport'
 import type { NativeChatComposerImageAttachment } from '../../attachments/chips/native-chat-image-attachment'
+import type { AgentType } from '../../../../../../shared/agent-status/contracts/agent-status-types'
+import { nativeChatMessageCommand } from '../../../../../../shared/native-chat/input/commands/native-chat-agent-profiles'
 import type { StructuredAgentSessionSendRequest } from '../../session/structured/delivery/structured-agent-session-send-slot'
 
 export async function dispatchNativeChatStructuredComposerText(
-  transport: NativeChatStructuredComposerTransport,
+  transport: Pick<NativeChatStructuredComposerTransport, 'dispatchCommand' | 'send'>,
   draftText: string,
   attachments: readonly NativeChatComposerImageAttachment[] = [],
   skills: readonly AgentJournalSkillRef[] = [],
@@ -19,7 +21,8 @@ export async function dispatchNativeChatStructuredComposerText(
     StructuredAgentSessionSendRequest,
     'alternate' | 'prepareAttachments' | 'onSettled'
   > = {},
-  onPending?: () => void
+  onPending?: () => void,
+  agent?: AgentType
 ): Promise<Omit<StructuredAgentSessionCommandOutcome, 'handled'> & { revealsTranscript: boolean }> {
   // Number image chips by their attachment order in this message.
   const prompt = imageReferencesToPromptMarkers(
@@ -37,9 +40,13 @@ export async function dispatchNativeChatStructuredComposerText(
   if (handled) {
     return { ...command, revealsTranscript: false }
   }
+  const message = nativeChatMessageCommand(agent, prompt)
+  if (message.error) {
+    return { accepted: false, error: message.error, revealsTranscript: false }
+  }
   // The composer still owns its draft until admission, so refusal must precede the handoff.
   const body = structuredAgentSessionSendBody(
-    prompt,
+    message.text,
     attachments.map(({ path }) => ({ path, previewUri: '' }))
   )
   if (structuredAgentSessionBlocksTooLarge(body.blocks)) {
@@ -52,8 +59,8 @@ export async function dispatchNativeChatStructuredComposerText(
   const request = { ...(skills.length > 0 ? { skills } : {}), ...intent }
   const admission =
     Object.keys(request).length > 0
-      ? transport.send(prompt, attachments, request)
-      : transport.send(prompt, attachments)
+      ? transport.send(message.text, attachments, request)
+      : transport.send(message.text, attachments)
   if (admission instanceof Promise) {
     onPending?.()
   }

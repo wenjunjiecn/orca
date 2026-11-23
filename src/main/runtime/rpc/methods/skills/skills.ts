@@ -45,6 +45,8 @@ import {
   SkillsGetInstallProgressParams
 } from '../../../../../shared/rpc-contract/skills/skills-params'
 import { unavailableWhileWslDistroStopped } from '../../../../skills/discovery/skill-discovery-stopped-wsl-roots'
+import { requireInstalledStructuredHost } from '../structured-sessions/creation/structured-agent-session-gate'
+import { discoverDshChatSkills } from '../../../../dsh/skills/dsh-chat-skill-discovery'
 import { runAsWslUserAct, wslDistroForPath } from '../../../../wsl/filesystem/wsl-unc-access-gate'
 
 // Use the same target resolution for discovery and delete-plan roots, including WSL.
@@ -92,8 +94,21 @@ export const SKILL_METHODS = [
     name: 'skills.discover',
     permission: 'workspace',
     params: SkillsDiscoverParams,
-    handler: async (params, { runtime }) =>
-      unavailableWhileWslDistroStopped(async () => {
+    handler: async (params, context) => {
+      const { runtime, signal } = context
+      if (params.agentSessionId) {
+        const host = await requireInstalledStructuredHost(context, params.agentSessionId)
+        return discoverDshChatSkills({
+          record: host.deps.store.getRecord(params.agentSessionId),
+          resolveWorkspacePath: (workspaceId) =>
+            runtime.resolveStructuredAgentSessionLocalWorkspacePath(`id:${workspaceId}`),
+          launchEnv: runtime.getClientSettings().agentDefaultEnv?.dsh ?? {},
+          ...(params.names ? { names: params.names } : {}),
+          ...(params.sourceKinds ? { sourceKinds: params.sourceKinds } : {}),
+          ...(signal ? { signal } : {})
+        })
+      }
+      return unavailableWhileWslDistroStopped(async () => {
         // Resolve WSL preferences on the executing host; remote clients provide workspace identity, not trusted runtime absence.
         const resolvedTarget = await resolveDiscoveryTarget(
           await withWorkspaceCwd(params, runtime),
@@ -105,6 +120,7 @@ export const SKILL_METHODS = [
           refresh: params.refresh === true
         })
       }, params.sourceKinds)
+    }
   }),
   defineMethod({
     name: 'skills.previewDelete',

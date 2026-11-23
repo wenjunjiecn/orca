@@ -36,7 +36,12 @@ export type NativeChatSkillStateInputs = Pick<
   | 'worktreesByRepo'
 >
 
-type NativeChatSkillTab = { id: string; startupCwd?: string }
+type NativeChatSkillTab = {
+  id: string
+  startupCwd?: string
+  entityId?: string
+  agentSessionAgent?: unknown
+}
 
 type NativeChatSkillWorktreeState = NativeChatTabDirectoryState & {
   tabsByWorktree: Record<string, readonly NativeChatSkillTab[]>
@@ -108,7 +113,9 @@ export function resolveNativeChatSkillDiscoveryContext(
   terminalTabId: string,
   launchWorktreeId?: string
 ): NativeChatSkillDiscoveryContext | null {
-  const worktreeId = launchWorktreeId ?? findNativeChatTab(state, terminalTabId)?.worktreeId ?? null
+  const found = launchWorktreeId ? null : findNativeChatTab(state, terminalTabId)
+  const worktreeId = launchWorktreeId ?? found?.worktreeId ?? null
+  const agentSessionId = found?.tab.agentSessionAgent === 'dsh' ? found.tab.entityId : undefined
   if (!worktreeId) {
     return null
   }
@@ -157,13 +164,19 @@ export function resolveNativeChatSkillDiscoveryContext(
       runtimeTarget.kind === 'environment' ? runtimeTarget.environmentId : null,
       hostId,
       projectRuntimeKey ?? null,
-      cwd
+      cwd,
+      ...(agentSessionId ? [agentSessionId] : [])
     ]),
     cwd,
     executionHostKind: runtimeEnvironmentId ? 'runtime' : 'local',
     runtimeTarget,
     // Let the owning runtime resolve WSL project preferences when this client lacks them.
-    discoveryTarget: { cwd, worktreeId, ...(projectRuntime ? { projectRuntime } : {}) }
+    discoveryTarget: {
+      cwd,
+      worktreeId,
+      ...(projectRuntime ? { projectRuntime } : {}),
+      ...(agentSessionId ? { agentSessionId } : {})
+    }
   }
 }
 

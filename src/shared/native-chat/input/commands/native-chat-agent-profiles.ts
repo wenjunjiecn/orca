@@ -116,7 +116,13 @@ const NATIVE_CHAT_AGENT_PROFILES: Record<NativeChatAgent, NativeChatAgentProfile
     skillSourceOwner: 'droid'
   },
   // Qwen lists its skills as commands once a session runs; Orca knows none of its skill folders.
-  'qwen-code': null
+  'qwen-code': null,
+  dsh: {
+    skillPrefix: '/',
+    skillSourceOwner: 'dsh',
+    keepsScannedSkills: true,
+    textDrivenCommands: ['goal', 'plan']
+  }
 }
 
 /** Whether `skill` under `source` reaches `profile`'s agent: shared roots, its own, and the skill
@@ -165,6 +171,37 @@ export function getNativeChatAgentProfile(
 /** Shared catalog for send/collision/envelope classification; Grok remains skills-only until its command catalog is verified. */
 export function getVerifiedNativeChatCommands(agent: AgentType): readonly SlashCommandSuggestion[] {
   return agent === 'grok' ? [] : getAgentSlashCommands(agent)
+}
+
+const dshMessagePrompts = new Map([
+  [
+    'goal',
+    'Work toward the following goal. State success criteria, then carry out the task and report the result:'
+  ],
+  [
+    'plan',
+    'Create a plan for the following task. Explain the steps and wait for my confirmation before implementing it:'
+  ]
+])
+
+/** Expand Orca's DSH shortcuts while leaving literal DSH skill commands intact. */
+export function nativeChatMessageCommand(
+  agent: AgentType | undefined,
+  text: string
+): { text: string; error?: string } {
+  if (agent !== 'dsh') {
+    return { text }
+  }
+  const match = /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(text)
+  const command = match?.[1]?.toLowerCase()
+  const prompt = command ? dshMessagePrompts.get(command) : undefined
+  if (!prompt) {
+    return { text }
+  }
+  const argument = match?.[2]?.trim()
+  return argument
+    ? { text: `${prompt}\n\n${argument}` }
+    : { text, error: `Describe the task after /${command}.` }
 }
 
 /** How the chat finds the reply to a verified command over a terminal session;

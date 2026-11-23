@@ -213,7 +213,8 @@ export function useNativeChatStructuredComposerSend({
             ? { prepareAttachments, onSettled: () => stagedInput?.release() }
             : {})
         },
-        consume
+        consume,
+        agent
       )
         .then(({ accepted, error, refusedWhile, revealsTranscript }) => {
           if (!hostCommand || isCurrent()) {
