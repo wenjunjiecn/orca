@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,8 +11,9 @@ afterEach(async () => {
 })
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'orca-dsh-skills-'))
-  directories.push(root)
+  const directory = await mkdtemp(join(tmpdir(), 'orca-dsh-skills-'))
+  directories.push(directory)
+  const root = await realpath(directory)
   const project = join(root, 'project')
   const cwd = join(project, 'subfolder')
   await mkdir(cwd, { recursive: true })
