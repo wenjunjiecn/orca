@@ -33,11 +33,11 @@ env:
 
 jobs:
   # GitHub discovers this manual entry point on the fork's default branch.
-  build-fork-dsh-macos:
+  build-fork-dsh-windows:
     if: github.repository == 'wenjunjiecn/orca' && startsWith(github.ref, 'refs/heads/feat/dsh-native-chat-v')
     permissions:
       contents: read
-    uses: ./.github/workflows/dsh-macos-build.yml
+    uses: ./.github/workflows/dsh-windows-build.yml
 
   # Resolve once before source execution so concurrent pushes cannot mix slot/template/desktop commits.
   resolve-ref:

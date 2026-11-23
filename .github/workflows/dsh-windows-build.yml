@@ -1,0 +1,99 @@
+name: DSH Windows development build
+
+on:
+  push:
+    branches: ['feat/dsh-native-chat-v*']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dsh-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    if: github.repository == 'wenjunjiecn/orca' && startsWith(github.ref, 'refs/heads/feat/dsh-native-chat-v')
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      ORCA_BACKGROUND_LAUNCH: '1'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      - name: Verify runner and Bun
+        shell: bash
+        run: |
+          test "$RUNNER_ARCH" = X64
+          test "$(pnpm exec bun --version)" = "$(node -p 'require("./package.json").devDependencies.bun')"
+
+      - name: Test DSH and ACP regressions
+        shell: bash
+        run: |
+          pnpm test --maxWorkers=1 acp-structured-dsh dsh-chat-skill-discovery \
+            dsh-skill-discovery native-chat-structured-composer-dispatch \
+            acp-structured-session-adapter acp-structured-antigravity acp-structured-cursor
+
+      - name: Type-check and build desktop outputs
+        shell: bash
+        run: pnpm run build:desktop:ci
+
+      - uses: ./.github/actions/prepare-windows-package-rust
+
+      - name: Prepare Electron and package the Windows installer
+        shell: bash
+        env:
+          ORCA_BUILD_COMMIT: ${{ github.sha }}
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          export ORCA_LOCAL_BUILD_VERSION="$version-local.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.g${ORCA_BUILD_COMMIT:0:12}"
+          pnpm run ensure:electron-runtime
+          pnpm exec electron-builder --config config/electron-builder.config.cjs --win nsis --x64 --publish never
+
+      - name: Verify the installer and packaged Windows application
+        shell: pwsh
+        run: |
+          $app = 'dist/win-unpacked/Orca.exe'
+          $image = [System.IO.BinaryReader]::new([System.IO.File]::OpenRead((Resolve-Path $app)))
+          try {
+            $image.BaseStream.Position = 0x3c
+            $image.BaseStream.Position = $image.ReadInt32()
+            if ($image.ReadUInt32() -ne 0x4550 -or $image.ReadUInt16() -ne 0x8664) {
+              throw "$app is not a Windows x64 executable"
+            }
+          } finally {
+            $image.Dispose()
+          }
+          $installer = 'dist/orca-windows-setup.exe'
+          if ((Get-Item $installer).Length -le 0) { throw 'The Windows installer is empty' }
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  orca-windows-setup.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+
+      - name: Upload the Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-dsh-windows-x64
+          path: |
+            dist/orca-windows-setup.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
