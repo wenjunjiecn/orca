@@ -45,8 +45,7 @@ import {
   SkillsGetInstallProgressParams
 } from '../../../../../shared/rpc-contract/skills/skills-params'
 import { unavailableWhileWslDistroStopped } from '../../../../skills/discovery/skill-discovery-stopped-wsl-roots'
-import { requireInstalledStructuredHost } from '../structured-sessions/creation/structured-agent-session-gate'
-import { discoverDshChatSkills } from '../../../../dsh/skills/dsh-chat-skill-discovery'
+import { discoverSkillsForDshChat, discoverSkillsForDshLaunch } from './dsh-skill-discovery-route'
 import { runAsWslUserAct, wslDistroForPath } from '../../../../wsl/filesystem/wsl-unc-access-gate'
 
 // Use the same target resolution for discovery and delete-plan roots, including WSL.
@@ -95,18 +94,10 @@ export const SKILL_METHODS = [
     permission: 'workspace',
     params: SkillsDiscoverParams,
     handler: async (params, context) => {
-      const { runtime, signal } = context
-      if (params.agentSessionId) {
-        const host = await requireInstalledStructuredHost(context, params.agentSessionId)
-        return discoverDshChatSkills({
-          record: host.deps.store.getRecord(params.agentSessionId),
-          resolveWorkspacePath: (workspaceId) =>
-            runtime.resolveStructuredAgentSessionLocalWorkspacePath(`id:${workspaceId}`),
-          launchEnv: runtime.getClientSettings().agentDefaultEnv?.dsh ?? {},
-          ...(params.names ? { names: params.names } : {}),
-          ...(params.sourceKinds ? { sourceKinds: params.sourceKinds } : {}),
-          ...(signal ? { signal } : {})
-        })
+      const { runtime } = context
+      const chatSkills = await discoverSkillsForDshChat(params, context)
+      if (chatSkills) {
+        return chatSkills
       }
       return unavailableWhileWslDistroStopped(async () => {
         // Resolve WSL preferences on the executing host; remote clients provide workspace identity, not trusted runtime absence.
@@ -115,6 +106,10 @@ export const SKILL_METHODS = [
           runtime,
           { refuseStoppedWslDistro: true }
         )
+        const launchSkills = discoverSkillsForDshLaunch(params, resolvedTarget, context)
+        if (launchSkills) {
+          return launchSkills
+        }
         return discoverSkillsOnTarget(resolvedTarget, runtime.listRepos(), {
           providerRootOverrides: await runtime.resolveSkillDiscoveryProviderRoots(resolvedTarget),
           refresh: params.refresh === true

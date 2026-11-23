@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { GENERIC_ACP_DIALECT } from '../acp/acp-dialects/acp-dialect'
+import { readDshMessageShortcut } from '../../shared/native-chat/input/commands/dsh-message-shortcuts'
 import { directoryAccountBinding } from '../acp/launch/acp-account-binding'
 import type { AcpLaunchSpec } from '../acp/launch/acp-launch-contract'
 
@@ -10,7 +10,7 @@ export const DSH_LAUNCH_SPEC: AcpLaunchSpec = {
   ignoreAgentCommandSetting: true,
   args: () => ['--profile', 'acp'],
   env: {},
-  dialect: GENERIC_ACP_DIALECT,
+  dialect: { messageShortcut: readDshMessageShortcut },
   loginCommand: [],
   account: directoryAccountBinding('DSH_HOME', (homePath) => join(homePath, '.dsh')),
   installDirectories: () => [],

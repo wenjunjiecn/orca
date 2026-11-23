@@ -65,6 +65,8 @@ export type SkillDiscoveryTarget = {
   sourceKinds?: SkillSourceKind[]
   /** Optional owning chat identity for agent-specific discovery under its pinned account. */
   agentSessionId?: string
+  /** A chat not yet started for this agent; scans its default folders before a session pins them. */
+  launchAgent?: 'dsh'
 }
 
 const ResolvedProjectRuntimeSchema = z.object({
@@ -121,7 +123,8 @@ export const SkillDiscoveryTargetSchema: z.ZodType<SkillDiscoveryTarget> = z.obj
     .array(z.enum(['home', 'repo', 'bundled', 'plugin']))
     .max(4)
     .optional(),
-  agentSessionId: z.string().min(1).max(128).optional()
+  agentSessionId: z.string().min(1).max(128).optional(),
+  launchAgent: z.literal('dsh').optional()
 })
 
 export type SkillFrontmatterSummary = {

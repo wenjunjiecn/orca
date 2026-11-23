@@ -21,22 +21,31 @@ function missing(error: unknown): boolean {
   )
 }
 
-async function projectRoot(cwd: string, signal?: AbortSignal): Promise<string> {
+/** One unreadable path must not hide every other skill; only aborts stop the scan. */
+function unreadable(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string'
+}
+
+// A dotfiles repository at the home directory is not the chat's project.
+async function projectRoot(cwd: string, home: string, signal?: AbortSignal): Promise<string> {
   const start = resolve(cwd)
-  for (let current = start; ; current = dirname(current)) {
+  const samePath = (left: string, right: string) =>
+    process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right
+  for (let current = start; !samePath(current, home); current = dirname(current)) {
     signal?.throwIfAborted()
     try {
       await stat(join(current, '.git'))
       return current
     } catch (error) {
-      if (!missing(error)) {
+      if (!unreadable(error)) {
         throw error
       }
     }
     if (dirname(current) === current) {
-      return start
+      break
     }
   }
+  return start
 }
 
 async function readSkill(
@@ -78,7 +87,7 @@ async function readSkill(
       updatedAt: info.mtimeMs
     }
   } catch (error) {
-    if (missing(error)) {
+    if (unreadable(error)) {
       return null
     }
     throw error
@@ -90,9 +99,11 @@ export async function discoverDshSkills(input: {
   cwd: string
   dshHome: string
   agentsHome: string
+  /** The user's home directory; it never counts as the project root. */
+  home: string
   signal?: AbortSignal
 }): Promise<SkillDiscoveryResult> {
-  const project = await projectRoot(input.cwd, input.signal)
+  const project = await projectRoot(input.cwd, resolve(input.home), input.signal)
   const roots: DshRoot[] = [
     { path: join(project, '.dsh', 'skills'), sourceKind: 'repo', label: 'DSH project' },
     { path: join(project, '.agents', 'skills'), sourceKind: 'repo', label: 'Project agent skills' },
@@ -108,7 +119,7 @@ export async function discoverDshSkills(input: {
   const byName = new Map<string, DshSkill>()
   for (const root of roots) {
     input.signal?.throwIfAborted()
-    let exists = true
+    let skippedReason: SkillDiscoverySource['skippedReason']
     let paths: string[] = []
     try {
       const entries = await readdir(root.path, { withFileTypes: true })
@@ -123,10 +134,10 @@ export async function discoverDshSkills(input: {
           return entry.isDirectory() || entry.isSymbolicLink() ? [join(path, 'SKILL.md')] : []
         })
     } catch (error) {
-      if (!missing(error)) {
+      if (!unreadable(error)) {
         throw error
       }
-      exists = false
+      skippedReason = missing(error) ? 'missing' : 'unavailable'
     }
     sources.push({
       id: `dsh-${stablePathId(root.path)}`,
@@ -135,8 +146,8 @@ export async function discoverDshSkills(input: {
       sourceKind: root.sourceKind,
       providers: ['agent-skills'],
       owner: 'dsh',
-      exists,
-      ...(!exists ? { skippedReason: 'missing' as const } : {})
+      exists: skippedReason !== 'missing',
+      ...(skippedReason ? { skippedReason } : {})
     })
     const skills = await runSkillCandidateTasks(
       paths.map((path) => () => readSkill(path, root, input.signal))

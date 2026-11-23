@@ -6,6 +6,7 @@ import {
   type NativeChatCommandReply,
   type SlashCommandSuggestion
 } from './native-chat-slash-commands'
+import { readDshMessageShortcut } from './dsh-message-shortcuts'
 
 export type NativeChatAgentProfile = {
   skillPrefix: '$' | '/'
@@ -173,35 +174,16 @@ export function getVerifiedNativeChatCommands(agent: AgentType): readonly SlashC
   return agent === 'grok' ? [] : getAgentSlashCommands(agent)
 }
 
-const dshMessagePrompts = new Map([
-  [
-    'goal',
-    'Work toward the following goal. State success criteria, then carry out the task and report the result:'
-  ],
-  [
-    'plan',
-    'Create a plan for the following task. Explain the steps and wait for my confirmation before implementing it:'
-  ]
-])
-
-/** Expand Orca's DSH shortcuts while leaving literal DSH skill commands intact. */
-export function nativeChatMessageCommand(
+/** Why a DSH message shortcut cannot be sent yet; the host expands valid ones before dispatch. */
+export function nativeChatMessageCommandProblem(
   agent: AgentType | undefined,
-  text: string
-): { text: string; error?: string } {
-  if (agent !== 'dsh') {
-    return { text }
-  }
-  const match = /^\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(text)
-  const command = match?.[1]?.toLowerCase()
-  const prompt = command ? dshMessagePrompts.get(command) : undefined
-  if (!prompt) {
-    return { text }
-  }
-  const argument = match?.[2]?.trim()
-  return argument
-    ? { text: `${prompt}\n\n${argument}` }
-    : { text, error: `Describe the task after /${command}.` }
+  text: string,
+  pickedSkillNames: readonly string[] = []
+): string | null {
+  const shortcut = agent === 'dsh' ? readDshMessageShortcut(text, pickedSkillNames) : null
+  return shortcut?.kind === 'missingArgument'
+    ? `Describe the task after /${shortcut.command}.`
+    : null
 }
 
 /** How the chat finds the reply to a verified command over a terminal session;

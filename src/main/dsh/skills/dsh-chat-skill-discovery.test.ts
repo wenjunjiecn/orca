@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { agentSessionRecordFixture } from '../../../shared/agent-session/lifecycle/records/agent-session-record.test-fixture'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/workspace/identity/floating-workspace-id'
-import { discoverDshChatSkills } from './dsh-chat-skill-discovery'
+import { discoverDshChatSkills, discoverDshLaunchSkills } from './dsh-chat-skill-discovery'
 import { discoverDshSkills } from './dsh-skill-discovery'
 
 vi.mock('./dsh-skill-discovery', () => ({
@@ -67,5 +67,15 @@ describe('DSH skill discovery account and host ownership', () => {
         })
       ).rejects.toThrow()
     }
+  })
+
+  it('reads the home a chat will launch with before any session pins it', async () => {
+    await discoverDshLaunchSkills({
+      cwd: '/workspace/draft',
+      launchEnv: { DSH_HOME: '/accounts/configured' }
+    })
+    expect(discoverDshSkills).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cwd: '/workspace/draft', dshHome: '/accounts/configured' })
+    )
   })
 })

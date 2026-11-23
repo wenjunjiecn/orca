@@ -70,9 +70,9 @@ export function useNativeChatSkills(
   const context = useMemo(
     () =>
       inputs
-        ? resolveNativeChatSkillDiscoveryContext(inputs, terminalTabId, launchWorktreeId)
+        ? resolveNativeChatSkillDiscoveryContext(inputs, terminalTabId, launchWorktreeId, agent)
         : null,
-    [inputs, terminalTabId, launchWorktreeId]
+    [inputs, terminalTabId, launchWorktreeId, agent]
   )
   const awaitingContext = useMemo(
     () =>

@@ -66,20 +66,26 @@ instead of token by token. Resume uses the saved DSH session without replaying i
 transcript; Orca retains the conversation in its own journal. If DSH cannot restore
 it, Orca warns and starts a new provider context.
 
-Type `/` to choose a filesystem skill. Orca reads the chat's pinned `DSH_HOME/skills`,
-the shared `DSH_AGENTS_HOME/skills` (default `~/.agents/skills`), and the nearest
-project's `.dsh/skills` and `.agents/skills`. Folder workspaces without `.git` use
-their chat directory as the project root. Directory bundles (`name/SKILL.md`) and
-top-level Markdown skills are supported; nested trees and `user-invocable: false`
-skills are excluded. Project definitions take priority over user definitions.
+Type `/` to choose a filesystem skill. Orca reads the chat's pinned `DSH_HOME/skills`
+(before the first message, the `DSH_HOME` that launch will use), the shared
+`DSH_AGENTS_HOME/skills` (default `~/.agents/skills`), and the nearest project's
+`.dsh/skills` and `.agents/skills`. Folder workspaces without `.git`, and a git
+repository at your home directory, use the chat directory as the project root.
+`DSH_AGENTS_HOME` is read from the current agent environment, so a change reaches a
+running chat's picker before DSH itself sees it on its next launch. Directory bundles
+(`name/SKILL.md`) and top-level Markdown skills are supported; nested trees,
+`user-invocable: false` skills, and files Orca cannot read are excluded. Project
+definitions take priority over user definitions.
 The selected `/skill-name` reaches DSH as ordinary user text, which its skill
 loader recognizes. Custom filesystem-provider configurations, bundled roots,
 and dynamically registered skills are not discoverable through this picker.
 
 `/goal <objective>` sends a message asking the model to work toward that objective.
 `/plan <task>` asks the model for a plan and to wait for your confirmation before implementation.
-These are message shortcuts, not DSH goal lifecycle or plan-mode controls. They
-can carry attachments like other messages. Existing `/model` and `/effort` controls
+These are message shortcuts, not DSH goal lifecycle or plan-mode controls. Orca
+expands them for every client, including mobile, and the transcript keeps what you
+typed. A skill named `goal` or `plan` that you pick from the menu runs as that skill.
+They can carry attachments like other messages. Existing `/model` and `/effort` controls
 still select the session's advertised options.
 
 This integration does not import DSH TUI/Web history or offer the transcript-based

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -19,7 +19,7 @@ async function fixture() {
   await mkdir(cwd, { recursive: true })
   const dshHome = join(root, 'account-a')
   const agentsHome = join(root, 'agent-config')
-  return { root, project, cwd, dshHome, agentsHome }
+  return { root, project, cwd, dshHome, agentsHome, home: join(root, 'home') }
 }
 
 async function skill(path: string, name: string, policy = '', description = name) {
@@ -67,6 +67,33 @@ describe('DSH default filesystem skill discovery', () => {
     )
     await skill(join(input.project, '.dsh', 'skills', 'outside.md'), 'outside')
     expect((await discoverDshSkills(input)).skills.map((entry) => entry.name)).toEqual(['manual'])
+  })
+
+  it('does not treat a home-directory git repository as the chat project', async () => {
+    const input = await fixture()
+    await writeFile(join(input.project, '.git'), 'gitdir: /fixture/dotfiles')
+    await skill(join(input.project, '.dsh', 'skills', 'dotfiles.md'), 'dotfiles')
+    await skill(join(input.cwd, '.dsh', 'skills', 'local.md'), 'local')
+    const result = await discoverDshSkills({ ...input, home: input.project })
+    expect(result.skills.map((entry) => entry.name)).toEqual(['local'])
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'skips an unreadable skill instead of hiding every other one',
+    async () => {
+      const input = await fixture()
+      const loop = join(input.dshHome, 'skills', 'loop.md')
+      await mkdir(dirname(loop), { recursive: true })
+      await symlink(loop, loop)
+      await skill(join(input.dshHome, 'skills', 'kept.md'), 'kept')
+      expect((await discoverDshSkills(input)).skills.map((entry) => entry.name)).toEqual(['kept'])
+    }
+  )
+
+  it('reads frontmatter after a byte order mark', () => {
+    expect(
+      readDshSkillMetadata('﻿---\nname: bom\ndescription: Saved by Notepad\n---\n')
+    ).toMatchObject({ name: 'bom' })
   })
 
   it('keeps account roots separate and honors cancellation', async () => {

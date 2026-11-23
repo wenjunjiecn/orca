@@ -15,6 +15,7 @@ import {
 } from '@/store/workspaces/catalog/workspace-record-fields'
 import type { AppState } from '../../../../store/types'
 import type { SkillDiscoveryTarget } from '../../../../../../shared/skills/discovery/skills'
+import type { AgentType } from '../../../../../../shared/agent-status/contracts/agent-status-types'
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 
 export type NativeChatSkillStateInputs = Pick<
@@ -111,11 +112,13 @@ export function isNativeChatSkillDiscoveryAwaitingDirectory(
 export function resolveNativeChatSkillDiscoveryContext(
   state: NativeChatSkillStateInputs,
   terminalTabId: string,
-  launchWorktreeId?: string
+  launchWorktreeId?: string,
+  launchAgent?: AgentType
 ): NativeChatSkillDiscoveryContext | null {
   const found = launchWorktreeId ? null : findNativeChatTab(state, terminalTabId)
   const worktreeId = launchWorktreeId ?? found?.worktreeId ?? null
   const agentSessionId = found?.tab.agentSessionAgent === 'dsh' ? found.tab.entityId : undefined
+  const dshLaunch = launchWorktreeId !== undefined && launchAgent === 'dsh'
   if (!worktreeId) {
     return null
   }
@@ -165,7 +168,8 @@ export function resolveNativeChatSkillDiscoveryContext(
       hostId,
       projectRuntimeKey ?? null,
       cwd,
-      ...(agentSessionId ? [agentSessionId] : [])
+      ...(agentSessionId ? [agentSessionId] : []),
+      ...(dshLaunch ? ['dsh-launch'] : [])
     ]),
     cwd,
     executionHostKind: runtimeEnvironmentId ? 'runtime' : 'local',
@@ -175,7 +179,8 @@ export function resolveNativeChatSkillDiscoveryContext(
       cwd,
       worktreeId,
       ...(projectRuntime ? { projectRuntime } : {}),
-      ...(agentSessionId ? { agentSessionId } : {})
+      ...(agentSessionId ? { agentSessionId } : {}),
+      ...(dshLaunch ? { launchAgent: 'dsh' as const } : {})
     }
   }
 }

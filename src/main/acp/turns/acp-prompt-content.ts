@@ -198,6 +198,27 @@ function isWithheldCommand(body: AgentJournalMessageItem, withheld: readonly str
   return text.startsWith('/') && withheld.includes(text.slice(1).split(/\s/, 1)[0].toLowerCase())
 }
 
+/** The body as the agent receives it, or null when a shortcut lacks its argument. */
+function acpShortcutBody(
+  body: AgentJournalMessageItem,
+  dialect: Pick<AcpLaunchSpec['dialect'], 'messageShortcut'>
+): AgentJournalMessageItem | null {
+  const [first, ...rest] = body.blocks
+  if (!dialect.messageShortcut || first?.type !== 'text') {
+    return body
+  }
+  const shortcut = dialect.messageShortcut(
+    first.text,
+    (body.skills ?? []).map(({ name }) => name)
+  )
+  if (!shortcut) {
+    return body
+  }
+  return shortcut.kind === 'expanded'
+    ? { ...body, blocks: [{ ...first, text: shortcut.text }, ...rest] }
+    : null
+}
+
 export async function acpDispatchPrompt(
   body: AgentJournalMessageItem,
   session: {
@@ -212,9 +233,16 @@ export async function acpDispatchPrompt(
       agentName: acpAgentName(session.spec.agent)
     })
   }
+  const prompted = acpShortcutBody(body, session.spec.dialect)
+  if (!prompted) {
+    return agentSessionFailureWords(agentSessionFailureFact('emptyMessage'), {
+      surface: 'rejection',
+      agentName: acpAgentName(session.spec.agent)
+    })
+  }
   try {
     return await acpPromptBlocks(
-      body,
+      prompted,
       await acpSessionAcceptsImages(session),
       session.spec.dialect.linksFileMentions ? session.cwd : undefined
     )

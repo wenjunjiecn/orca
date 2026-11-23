@@ -9,7 +9,7 @@ import type { StructuredAgentSessionCommandOutcome } from '../../../../../../sha
 import type { NativeChatStructuredComposerTransport } from './native-chat-structured-composer-transport'
 import type { NativeChatComposerImageAttachment } from '../../attachments/chips/native-chat-image-attachment'
 import type { AgentType } from '../../../../../../shared/agent-status/contracts/agent-status-types'
-import { nativeChatMessageCommand } from '../../../../../../shared/native-chat/input/commands/native-chat-agent-profiles'
+import { nativeChatMessageCommandProblem } from '../../../../../../shared/native-chat/input/commands/native-chat-agent-profiles'
 import type { StructuredAgentSessionSendRequest } from '../../session/structured/delivery/structured-agent-session-send-slot'
 
 export async function dispatchNativeChatStructuredComposerText(
@@ -40,13 +40,17 @@ export async function dispatchNativeChatStructuredComposerText(
   if (handled) {
     return { ...command, revealsTranscript: false }
   }
-  const message = nativeChatMessageCommand(agent, prompt)
-  if (message.error) {
-    return { accepted: false, error: message.error, revealsTranscript: false }
+  const problem = nativeChatMessageCommandProblem(
+    agent,
+    prompt,
+    skills.map(({ name }) => name)
+  )
+  if (problem) {
+    return { accepted: false, error: problem, revealsTranscript: false }
   }
   // The composer still owns its draft until admission, so refusal must precede the handoff.
   const body = structuredAgentSessionSendBody(
-    message.text,
+    prompt,
     attachments.map(({ path }) => ({ path, previewUri: '' }))
   )
   if (structuredAgentSessionBlocksTooLarge(body.blocks)) {
@@ -59,8 +63,8 @@ export async function dispatchNativeChatStructuredComposerText(
   const request = { ...(skills.length > 0 ? { skills } : {}), ...intent }
   const admission =
     Object.keys(request).length > 0
-      ? transport.send(message.text, attachments, request)
-      : transport.send(message.text, attachments)
+      ? transport.send(prompt, attachments, request)
+      : transport.send(prompt, attachments)
   if (admission instanceof Promise) {
     onPending?.()
   }

@@ -1,4 +1,5 @@
 import type { AgentSessionAccountKind } from '../../../shared/agent-session/failures/agent-session-availability'
+import type { DshMessageShortcut } from '../../../shared/native-chat/input/commands/dsh-message-shortcuts'
 import type { AgentSessionContextUsage } from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
 import type { AgentSessionUsageLimit } from '../../../shared/agent-session/failures/agent-session-usage-limit'
 import type { AgentSessionInteractionMode } from '../../../shared/agent-session/options/permissions/agent-session-interaction-mode'
@@ -111,6 +112,8 @@ export type AcpDialectNotification =
     }
 
 /** Hook denial completes the turn rather than recording a user Stop. */
+export type AcpMessageShortcut = DshMessageShortcut
+
 export type AcpHookBlock = { reason?: string }
 
 export type AcpTurnEnding = {
@@ -243,6 +246,8 @@ export type AcpDialect = {
   }
   /** The agent reads a mentioned file only from a resource link, not from `@path` text. */
   linksFileMentions?: true
+  /** Expands Orca's own message shortcut before dispatch; the journal keeps what the user typed. */
+  messageShortcut?(text: string, pickedSkillNames: readonly string[]): AcpMessageShortcut | null
   /** Hide these commands and reject command-only prompts before dispatch. */
   withheldCommands?: readonly string[]
   /** Which sign-in a not-signed-in chat needs; absent is the agent's usual one. */

@@ -7,7 +7,6 @@ import { createProviderSpawnSpec } from '../../provider-process/provider-process
 import { supportsSupervisedProviderChildLocation } from '../../provider-process/supervised-provider-child-location'
 import { structuredAgentRuntimeRegistration } from '../../runtime/agent-session/installation/structured-agent-runtime-registrations'
 import { createAcpStructuredLaunchResolver } from '../../runtime/agent-session/launch/structured-agent-launch-composition.test-support'
-import { GENERIC_ACP_DIALECT } from '../acp-dialects/acp-dialect'
 import { acpLaunchSpecFor } from './acp-launch-registry'
 import { canToggleNativeChat } from '../../../shared/native-chat/native-chat-availability'
 
@@ -47,7 +46,7 @@ function launch(fullAccess: boolean, launchEnv: Record<string, string> = {}) {
 describe('DeepSeek Harness ACP registration and launch', () => {
   it('uses the generic adapter capabilities without inventing interactive controls', () => {
     const registration = structuredAgentRuntimeRegistration('dsh')!
-    expect(DSH.dialect).toBe(GENERIC_ACP_DIALECT)
+    expect(DSH.dialect).toEqual({ messageShortcut: expect.any(Function) })
     expect(registration.definition).toMatchObject({
       agent: 'dsh',
       handleTransport: 'acp',

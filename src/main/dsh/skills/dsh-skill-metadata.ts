@@ -32,7 +32,7 @@ function invocationBoolean(value: unknown): boolean | undefined {
 export function readDshSkillMetadata(
   markdown: string
 ): { name: string; description: string; userInvocable: boolean } | null {
-  const match = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/.exec(markdown)
+  const match = /^\uFEFF?---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/.exec(markdown)
   if (!match) {
     return null
   }

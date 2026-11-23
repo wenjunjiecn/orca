@@ -30,28 +30,10 @@ describe('DSH structured composer', () => {
     ])
   })
 
-  it('sends goal and plan as instructions and passes a DSH skill invocation verbatim', async () => {
+  it('hands goal to the host as typed so the transcript keeps what was sent', async () => {
     const { send, submit } = dshComposer()
     await submit('/goal repair the tests')
-    await submit('/plan repair the tests')
-    await submit('/review-guide inspect the tests')
-    await submit('/constructor inspect the tests')
-    expect(send.mock.calls).toEqual([
-      [
-        expect.stringContaining(
-          'State success criteria, then carry out the task and report the result:\n\nrepair the tests'
-        ),
-        []
-      ],
-      [
-        expect.stringContaining(
-          'wait for my confirmation before implementing it:\n\nrepair the tests'
-        ),
-        []
-      ],
-      ['/review-guide inspect the tests', []],
-      ['/constructor inspect the tests', []]
-    ])
+    expect(send.mock.calls).toEqual([['/goal repair the tests', []]])
   })
 
   it('keeps an empty shortcut in the composer without submitting it', async () => {
